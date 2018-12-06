@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">Twitch OBS Helper</string>
-    <string name="login_user">Username</string>
-    <string name="login_token">Twitch Token</string>
-    <string name="login_login">Save &amp; Login</string>
-    <string name="login_error">Please enter a Username and the correct Token!</string>
+    <string name="login_user">Twitch User Name</string>
+    <string name="login_login">Login</string>
+    <string name="login_welcome">Welcome to Twitch OBS Helper</string>
+    <string name="login_error">Please enter a User Name</string>
 </resources>
