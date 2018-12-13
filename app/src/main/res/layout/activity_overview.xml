@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/overview_cl"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <TextView
-        android:id="@+id/textView2"
+    <Button
+        android:id="@+id/overview_btn_game"
         android:layout_width="wrap_content"
-        android:layout_height="20dp"
+        android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
         android:layout_marginTop="8dp"
         android:text="Game"
@@ -23,18 +23,19 @@
         android:layout_marginStart="50dp"
         android:layout_marginEnd="8dp"
         android:text="Nix"
-        app:layout_constraintBaseline_toBaselineOf="@+id/textView2"
+        app:layout_constraintBaseline_toBaselineOf="@+id/overview_btn_game"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@+id/textView2" />
+        app:layout_constraintStart_toEndOf="@+id/overview_btn_game" />
 
     <TextView
         android:id="@+id/textView3"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
         android:layout_marginTop="20dp"
         android:text="Viewer"
-        app:layout_constraintStart_toStartOf="@+id/textView2"
-        app:layout_constraintTop_toBottomOf="@+id/textView2" />
+        app:layout_constraintStart_toStartOf="@+id/overview_btn_game"
+        app:layout_constraintTop_toBottomOf="@+id/overview_btn_game" />
 
     <TextView
         android:id="@+id/overview_viewer"
@@ -45,4 +46,5 @@
         app:layout_constraintBaseline_toBaselineOf="@+id/textView3"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="@+id/overview_game" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>
