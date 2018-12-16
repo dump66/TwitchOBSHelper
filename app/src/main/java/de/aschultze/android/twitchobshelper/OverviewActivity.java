@@ -12,10 +12,11 @@ import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
-import android.widget.Filter;
 import android.widget.PopupWindow;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import com.android.volley.AuthFailureError;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.toolbox.JsonObjectRequest;
@@ -34,7 +35,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.constraintlayout.widget.ConstraintLayout;
@@ -46,6 +46,8 @@ public class OverviewActivity extends AppCompatActivity {
     private static final String TWITCH_CLIENT_ID = "rveutt431uc0qwzp6ncbp4cm7edqoj";
     private static final int TWITCH_UPDATE = 0;
     private static final int TWITCH_SEARCH = 1;
+    private static final int TWITCH_CHANNEL_ID = 2;
+    private static final int TWITCH_UDDATE_GAME = 3;
 
     private TextView mGame;
     private TextView mViewer;
@@ -58,6 +60,8 @@ public class OverviewActivity extends AppCompatActivity {
     private AutoCompleteTextView mGameChooser;
     private ArrayAdapter<String> mAdapter;
     private RequestQueue mQueue;
+    private String mChannelID;
+    private Button mRefresh;
 
     public static Intent newIntent(Context packageContext, String token) {
         Intent intent = new Intent(packageContext, OverviewActivity.class);
@@ -76,6 +80,7 @@ public class OverviewActivity extends AppCompatActivity {
         mPopupWindow = new PopupWindow(popupView, ConstraintLayout.LayoutParams.MATCH_PARENT, ConstraintLayout.LayoutParams.MATCH_PARENT, true);
 
         // Member variable init
+        mRefresh = findViewById(R.id.overview_refresh);
         mGame = findViewById(R.id.overview_game);
         mViewer = findViewById(R.id.overview_viewer);
         mGameBtn = findViewById(R.id.overview_btn_game);
@@ -89,6 +94,7 @@ public class OverviewActivity extends AppCompatActivity {
         mQueue = Volley.newRequestQueue(this);
 
         updateTwitchGUI();
+        getChannelID();
 
         initListener();
     }
@@ -118,21 +124,71 @@ public class OverviewActivity extends AppCompatActivity {
             }
         });
 
+        mRefresh.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                updateTwitchGUI();
+            }
+        });
+
         mOkButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                mPopupWindow.dismiss();
+                updateChannelGame();
             }
         });
     }
 
     private void updateTwitchGUI() {
-        mQueue = Volley.newRequestQueue(OverviewActivity.this);
         RequestFuture<JSONObject> futureRequestStream = RequestFuture.newFuture();
         JsonObjectRequest streamDataRequest = getStreamDataRequest(futureRequestStream);
         mQueue.add(streamDataRequest);
-        new TwitchFetchr(futureRequestStream, TWITCH_UPDATE).execute();
+        new TwitchRequester(futureRequestStream, TWITCH_UPDATE).execute();
     }
+
+
+    private void getChannelID() {
+        RequestFuture<JSONObject> future = RequestFuture.newFuture();
+        String url = "https://api.twitch.tv/kraken/channel";
+        JsonObjectRequest channelRequest = new JsonObjectRequest(Request.Method.GET, url, null, future, future) {
+            @Override
+            public Map<String, String> getHeaders() throws AuthFailureError {
+                HashMap headers = new HashMap();
+                headers.put("Accept", "application/vnd.twitchtv.v5+json");
+                headers.put("Client-ID", TWITCH_CLIENT_ID);
+                headers.put("Authorization", "OAuth " + mToken);
+                return headers;
+            }
+        };
+        mQueue.add(channelRequest);
+        new TwitchRequester(future, TWITCH_CHANNEL_ID).execute();
+    }
+
+    private void updateChannelGame() {
+        try {
+            RequestFuture<JSONObject> future = RequestFuture.newFuture();
+            String url = "https://api.twitch.tv/kraken/channels/" + mChannelID;
+            JSONObject channel = new JSONObject();
+            channel.put("game", mGameChooser.getText().toString());
+            JSONObject request = new JSONObject();
+            request.put("channel", channel);
+            JsonObjectRequest gameUpdateRequest = new JsonObjectRequest(Request.Method.PUT, url, request, future, future) {
+                @Override
+                public Map<String, String> getHeaders() throws AuthFailureError {
+                    HashMap headers = new HashMap();
+                    headers.put("Accept", "application/vnd.twitchtv.v5+json");
+                    headers.put("Client-ID", TWITCH_CLIENT_ID);
+                    headers.put("Authorization", "OAuth " + mToken);
+                    return headers;
+                }
+            };
+            mQueue.add(gameUpdateRequest);
+            new TwitchRequester(future, TWITCH_UDDATE_GAME).execute();
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
 
     private JsonObjectRequest getStreamDataRequest(RequestFuture<JSONObject> future) {
         String url = "https://api.twitch.tv/helix/streams?user_login=dump66";
@@ -177,17 +233,17 @@ public class OverviewActivity extends AppCompatActivity {
 
         mQueue.add(streamDataRequest);
         ;
-        new TwitchFetchr(streamFuture, TWITCH_SEARCH).execute();
+        new TwitchRequester(streamFuture, TWITCH_SEARCH).execute();
 
 
     }
 
-    private class TwitchFetchr extends AsyncTask<Void, Void, List<JSONObject>> {
+    private class TwitchRequester extends AsyncTask<Void, Void, List<JSONObject>> {
 
         private RequestFuture<JSONObject> future;
         private int state;
 
-        private TwitchFetchr(RequestFuture<JSONObject> future, int state) {
+        private TwitchRequester(RequestFuture<JSONObject> future, int state) {
             this.future = future;
             this.state = state;
         }
@@ -214,6 +270,15 @@ public class OverviewActivity extends AppCompatActivity {
                     case TWITCH_SEARCH:
                         JSONObject gameSearch = future.get(10, TimeUnit.SECONDS);
                         jsonObjects.add(gameSearch);
+                        break;
+                    case TWITCH_CHANNEL_ID:
+                        JSONObject channel = future.get(10, TimeUnit.SECONDS);
+                        jsonObjects.add(channel);
+                        break;
+                    case TWITCH_UDDATE_GAME:
+                        JSONObject gameUpdate = future.get(10, TimeUnit.SECONDS);
+                        jsonObjects.add(gameUpdate);
+                        break;
                 }
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -272,32 +337,38 @@ public class OverviewActivity extends AppCompatActivity {
                             e.printStackTrace();
                         }
                     }
+                    break;
+                case TWITCH_CHANNEL_ID:
+                    if (!jsonObjects.isEmpty()) {
+                        try {
+                            JSONObject channel = jsonObjects.get(0);
+                            if (channel.has("_id")) {
+                                mChannelID = channel.getString("_id");
+                            }
+                        } catch (JSONException e) {
+                            Toast.makeText(OverviewActivity.this, "Couldn't request Channel ID", Toast.LENGTH_LONG).show();
+                            e.printStackTrace();
+                        }
+                    }
+                    break;
+                case TWITCH_UDDATE_GAME:
+                    if (!jsonObjects.isEmpty()) {
+                        try {
+                            JSONObject update = jsonObjects.get(0);
+                            if (update.has("game")) {
+                                mPopupWindow.dismiss();
+                                updateTwitchGUI();
+                                Toast.makeText(OverviewActivity.this, "Game is set to\n"+update.get("game"), Toast.LENGTH_LONG).show();
+                            }
+                        } catch (JSONException e) {
+                            Toast.makeText(OverviewActivity.this, "Couldn't update Game", Toast.LENGTH_LONG).show();
+                            e.printStackTrace();
+                        }
+                    }
+                    break;
             }
 
         }
 
-    }
-
-    private class NoFilterArrayAdapter extends ArrayAdapter {
-
-        public NoFilterArrayAdapter(@NonNull Context context, int resource, @NonNull List objects) {
-            super(context, resource, objects);
-        }
-
-        @NonNull
-        @Override
-        public Filter getFilter() {
-            return new Filter() {
-                @Override
-                protected FilterResults performFiltering(CharSequence charSequence) {
-                    return new FilterResults();
-                }
-
-                @Override
-                protected void publishResults(CharSequence charSequence, FilterResults filterResults) {
-
-                }
-            };
-        }
     }
 }

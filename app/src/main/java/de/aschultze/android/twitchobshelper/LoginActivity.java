@@ -64,7 +64,7 @@ public class LoginActivity extends AppCompatActivity {
                     }
                 });
                 String state = "15098B9074AB4157F92E09B6BF89A0E9";
-                String url = "https://id.twitch.tv/oauth2/authorize?client_id=rveutt431uc0qwzp6ncbp4cm7edqoj&redirect_uri=http://localhost&response_type=token&scope=channel_editor&state=" + state;
+                String url = "https://id.twitch.tv/oauth2/authorize?client_id=rveutt431uc0qwzp6ncbp4cm7edqoj&redirect_uri=http://localhost&response_type=token&scope=channel_editor channel_read&state=" + state;
                 webView.loadUrl(url);
             }
         });
