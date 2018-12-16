@@ -3,4 +3,9 @@
     <string name="login_description">First login to Twitch please!</string>
     <string name="login_login">Login</string>
     <string name="login_welcome">Welcome to Twitch OBS Helper</string>
+    <string name="overview_stream_online">Stream online</string>
+    <string name="overview_stream_offline">Stream offline</string>
+    <string name="overview_viewers">Current Viewers</string>
+    <string name="chooser_ok">OK</string>
+    <string name="chooser_cancel">Cancel</string>
 </resources>

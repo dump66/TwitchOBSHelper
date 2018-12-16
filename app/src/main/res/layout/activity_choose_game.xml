@@ -8,7 +8,7 @@
     android:background="@color/design_default_color_background">
 
     <AutoCompleteTextView
-        android:id="@+id/game_chooser"
+        android:id="@+id/chooser_actv"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
@@ -16,28 +16,38 @@
         android:hint="Enter Game"
         app:layout_constraintBaseline_toBaselineOf="@+id/textView2"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@+id/textView2" />
+        app:layout_constraintStart_toEndOf="@+id/textView2"
+        android:imeOptions="flagNoExtractUi"/>
 
     <TextView
         android:id="@+id/textView2"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="15dp"
-        android:layout_marginTop="50dp"
+        android:layout_marginTop="8dp"
         android:text="Select Game"
         android:textSize="18sp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
     <Button
-        android:id="@+id/game_ok"
+        android:id="@+id/chooser_ok"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
+        android:layout_marginEnd="80dp"
+        android:text="@string/chooser_ok"
+        android:textColor="@android:color/holo_green_dark"
+        app:layout_constraintBaseline_toBaselineOf="@+id/chooser_cancel"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <Button
+        android:id="@+id/chooser_cancel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="80dp"
         android:layout_marginTop="20dp"
-        android:layout_marginEnd="8dp"
-        android:text="OK"
-        app:layout_constraintEnd_toEndOf="parent"
+        android:text="@string/chooser_cancel"
+        android:textColor="@android:color/holo_red_dark"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/game_chooser" />
+        app:layout_constraintTop_toBottomOf="@+id/chooser_actv" />
 </androidx.constraintlayout.widget.ConstraintLayout>
