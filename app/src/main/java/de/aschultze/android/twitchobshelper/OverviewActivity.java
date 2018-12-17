@@ -2,6 +2,7 @@ package de.aschultze.android.twitchobshelper;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.text.Editable;
@@ -14,8 +15,8 @@ import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.PopupWindow;
+import android.widget.ProgressBar;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.android.volley.AuthFailureError;
 import com.android.volley.Request;
@@ -58,6 +59,7 @@ public class OverviewActivity extends AppCompatActivity {
     private String mChannelID;
 
     // GUI member variables
+    private ProgressBar mProgressBar;
     private Button mStreamStatusButton;
     private Button mGameButton;
     private TextView mGameTitleTV;
@@ -91,6 +93,7 @@ public class OverviewActivity extends AppCompatActivity {
 
         // GUI member variable init
         // Overview
+        mProgressBar = findViewById(R.id.overview_progress);
         mStreamStatusButton = findViewById(R.id.overview_stream_status);
         mGameButton = findViewById(R.id.overview_btn_game);
         mGameTitleTV = findViewById(R.id.overview_game);
@@ -247,6 +250,15 @@ public class OverviewActivity extends AppCompatActivity {
         }
     }
 
+    private void setViewerCount(int viewers) {
+        mViewerCountTV.setText(Integer.toString(viewers));
+        if (viewers > 0) {
+            mViewerCountTV.setTextColor(getResources().getColor(R.color.colorPrimary));
+        } else {
+            mViewerCountTV.setTextColor(Color.BLACK);
+        }
+    }
+
     private class TwitchRequester extends AsyncTask<Void, Void, JSONObject> {
 
         private static final String TAG = "TwitchRequester";
@@ -257,6 +269,9 @@ public class OverviewActivity extends AppCompatActivity {
         private TwitchRequester(RequestFuture<JSONObject> future, int state) {
             this.future = future;
             this.state = state;
+            if (state == TWITCH_REQUEST_CHANNEL || state == TWITCH_REQUEST_STREAM) {
+                mProgressBar.setVisibility(View.VISIBLE);
+            }
         }
 
         @Override
@@ -296,9 +311,6 @@ public class OverviewActivity extends AppCompatActivity {
                             Log.d(TAG, "Updating game title went wrong!");
                         }
                         break;
-                    default:
-                        jsonObject = new JSONObject();
-                        break;
                 }
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -320,10 +332,13 @@ public class OverviewActivity extends AppCompatActivity {
                             String gameTitle = (String) jsonObject.getString("game");
                             mGameTitleTV.setText(gameTitle);
 
-                            // Set Channel ID for future requests
-                            // Once should be enough, but it doesn't harm setting it on each update
+                            // Set Channel ID once for future requests
                             if (jsonObject.has("_id")) {
-                                mChannelID = (String) jsonObject.getString("_id");
+                                if (mChannelID == null || mChannelID.isEmpty()) {
+                                    mChannelID = (String) jsonObject.getString("_id");
+                                    // start again for stream status and viewer update
+                                    retrieveChannelData();
+                                }
                             } else {
                                 if (mChannelID == null || mChannelID.isEmpty()) {
                                     Log.d(TAG, "Channel ID was not set!");
@@ -342,14 +357,13 @@ public class OverviewActivity extends AppCompatActivity {
                         // Stream is offline
                         if (jsonObject.isNull("stream")) {
                             setStreamStatus(false);
-                            mViewerCountTV.setText("-");
+                            setViewerCount(0);
                         } else {
                             JSONObject stream = jsonObject.getJSONObject("stream");
                             setStreamStatus(true);
                             // Set game title only by channel update
 //                            mGameTitleTV.setText(stream.getString("game"));
-                            mViewerCountTV.setText(Integer.toString(stream.getInt("viewers")));
-
+                            setViewerCount(stream.getInt("viewers"));
                         }
                     } catch (JSONException e) {
                         e.printStackTrace();
@@ -379,14 +393,14 @@ public class OverviewActivity extends AppCompatActivity {
                     try {
                         mGameChooserPopup.dismiss();
                         retrieveChannelData();
-                        Toast.makeText(OverviewActivity.this, "Game is successfully set to\n" + jsonObject.getString("game"), Toast.LENGTH_LONG).show();
+                        Log.d(TAG, "Game is successfully set to " + jsonObject.getString("game"));
                     } catch (JSONException e) {
                         e.printStackTrace();
                         Log.d(TAG, "Game Title could not be updated");
                     }
                     break;
             }
-
+            mProgressBar.setVisibility(View.INVISIBLE);
         }
 
     }
