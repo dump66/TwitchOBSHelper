@@ -8,4 +8,5 @@
     <string name="overview_viewers">Current Viewers</string>
     <string name="chooser_ok">OK</string>
     <string name="chooser_cancel">Cancel</string>
+    <string name="overview_refresh">Auto Refresh</string>
 </resources>

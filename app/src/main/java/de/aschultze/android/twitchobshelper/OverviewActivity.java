@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
@@ -14,6 +15,7 @@ import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
+import android.widget.CompoundButton;
 import android.widget.PopupWindow;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -38,6 +40,7 @@ import java.util.concurrent.TimeoutException;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.SwitchCompat;
 import androidx.constraintlayout.widget.ConstraintLayout;
 
 public class OverviewActivity extends AppCompatActivity {
@@ -46,6 +49,11 @@ public class OverviewActivity extends AppCompatActivity {
     private static final String TAG = "OverviewActivity";
     private static final String EXTRA_TOKEN = "de.aschultze.android.twitchobshelper.token";
     private static final String TWITCH_CLIENT_ID = "rveutt431uc0qwzp6ncbp4cm7edqoj";
+
+    // Scheduler
+    private Handler refreshHandler;
+    private Runnable refreshRunnable;
+    private int refreshSeconds = 10;
 
     // TwitchRequester states
     private static final int TWITCH_REQUEST_CHANNEL = 0;
@@ -64,7 +72,7 @@ public class OverviewActivity extends AppCompatActivity {
     private Button mGameButton;
     private TextView mGameTitleTV;
     private TextView mViewerCountTV;
-    private Button mRefreshButton;
+    private SwitchCompat mRefreshSwitch;
     private PopupWindow mGameChooserPopup;
     private Button mGameChooserOkButton;
     private Button mGameChooserCancelButton;
@@ -86,6 +94,17 @@ public class OverviewActivity extends AppCompatActivity {
         mToken = getIntent().getStringExtra(EXTRA_TOKEN);
         mHttpRequestQueue = Volley.newRequestQueue(this);
 
+        // Scheduler init
+        refreshHandler = new Handler();
+        refreshRunnable = new Runnable() {
+            @Override
+            public void run() {
+                refreshGUI();
+                long millis = refreshSeconds * 1000;
+                refreshHandler.postDelayed(refreshRunnable, millis);
+            }
+        };
+
         // PopUpWindow init
         LayoutInflater inflater = (LayoutInflater) getApplicationContext().getSystemService(LAYOUT_INFLATER_SERVICE);
         View popupView = inflater.inflate(R.layout.activity_choose_game, null);
@@ -98,7 +117,7 @@ public class OverviewActivity extends AppCompatActivity {
         mGameButton = findViewById(R.id.overview_btn_game);
         mGameTitleTV = findViewById(R.id.overview_game);
         mViewerCountTV = findViewById(R.id.overview_viewer);
-        mRefreshButton = findViewById(R.id.overview_refresh);
+        mRefreshSwitch = findViewById(R.id.overview_refresh);
 
         // PopupWindow
         mGameChooserACTV = mGameChooserPopup.getContentView().findViewById(R.id.chooser_actv);
@@ -110,8 +129,20 @@ public class OverviewActivity extends AppCompatActivity {
         mGameChooserCancelButton = mGameChooserPopup.getContentView().findViewById(R.id.chooser_cancel);
 
         initListener();
-        retrieveChannelData();
+        mRefreshSwitch.setChecked(true);
 
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        mRefreshSwitch.setChecked(false);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        mRefreshSwitch.setChecked(true);
     }
 
     private void initListener() {
@@ -142,10 +173,16 @@ public class OverviewActivity extends AppCompatActivity {
             }
         });
 
-        mRefreshButton.setOnClickListener(new View.OnClickListener() {
+        mRefreshSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
-            public void onClick(View view) {
-                retrieveChannelData();
+            public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
+                if (b) {
+                    Log.d(TAG, "Starting Refresh Handler");
+                    refreshHandler.postDelayed(refreshRunnable, 0);
+                } else {
+                    refreshHandler.removeCallbacks(refreshRunnable);
+                    Log.d(TAG, "Stopped Refresh Handler");
+                }
             }
         });
 
@@ -163,7 +200,8 @@ public class OverviewActivity extends AppCompatActivity {
         });
     }
 
-    private void retrieveChannelData() {
+    private void refreshGUI() {
+        Log.d(TAG, "Refreshing GUI...");
         // Get Game
         RequestFuture<JSONObject> futureRequestChannel = RequestFuture.newFuture();
         String channelURL = "https://api.twitch.tv/kraken/channel";
@@ -190,6 +228,7 @@ public class OverviewActivity extends AppCompatActivity {
                     HashMap headers = new HashMap();
                     headers.put("Accept", "application/vnd.twitchtv.v5+json");
                     headers.put("Client-ID", TWITCH_CLIENT_ID);
+                    headers.put("Authorization", "OAuth " + mToken);
                     return headers;
                 }
             };
@@ -232,6 +271,7 @@ public class OverviewActivity extends AppCompatActivity {
                 HashMap headers = new HashMap();
                 headers.put("Accept", "application/vnd.twitchtv.v5+json");
                 headers.put("Client-ID", TWITCH_CLIENT_ID);
+                headers.put("Authorization", "OAuth " + mToken);
                 return headers;
             }
         };
@@ -337,7 +377,7 @@ public class OverviewActivity extends AppCompatActivity {
                                 if (mChannelID == null || mChannelID.isEmpty()) {
                                     mChannelID = (String) jsonObject.getString("_id");
                                     // start again for stream status and viewer update
-                                    retrieveChannelData();
+                                    refreshGUI();
                                 }
                             } else {
                                 if (mChannelID == null || mChannelID.isEmpty()) {
@@ -365,6 +405,7 @@ public class OverviewActivity extends AppCompatActivity {
 //                            mGameTitleTV.setText(stream.getString("game"));
                             setViewerCount(stream.getInt("viewers"));
                         }
+                        Log.d(TAG, "GUI Refresh completed");
                     } catch (JSONException e) {
                         e.printStackTrace();
                     }
@@ -392,7 +433,7 @@ public class OverviewActivity extends AppCompatActivity {
                 case TWITCH_UPDATE_GAME:
                     try {
                         mGameChooserPopup.dismiss();
-                        retrieveChannelData();
+                        refreshGUI();
                         Log.d(TAG, "Game is successfully set to " + jsonObject.getString("game"));
                     } catch (JSONException e) {
                         e.printStackTrace();

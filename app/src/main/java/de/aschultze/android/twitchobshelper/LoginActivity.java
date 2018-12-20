@@ -11,6 +11,7 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import android.widget.Button;
 import android.widget.PopupWindow;
+import android.widget.ProgressBar;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -22,11 +23,11 @@ public class LoginActivity extends AppCompatActivity {
 
     private static final String TAG = "LoginActivity";
 
-    private Context mContext;
     private Activity mActivity;
 
     private ConstraintLayout mLayout;
     private Button mLogin;
+    private ProgressBar mProgress;
 
     private PopupWindow mPopupWindow;
 
@@ -35,15 +36,17 @@ public class LoginActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
 
-        mContext = getApplicationContext();
         mActivity = LoginActivity.this;
         mLayout = findViewById(R.id.login_cl);
         mLogin = findViewById(R.id.login_btn_login);
+        mProgress = findViewById(R.id.login_progress);
+
 
         mLogin.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                LayoutInflater inflater = (LayoutInflater) mContext.getSystemService(LAYOUT_INFLATER_SERVICE);
+                mProgress.setVisibility(View.VISIBLE);
+                LayoutInflater inflater = (LayoutInflater) getApplicationContext().getSystemService(LAYOUT_INFLATER_SERVICE);
                 View popupView = inflater.inflate(R.layout.activity_auth, null);
                 mPopupWindow = new PopupWindow(popupView, ConstraintLayout.LayoutParams.MATCH_PARENT, ConstraintLayout.LayoutParams.MATCH_PARENT, true);
                 mPopupWindow.showAtLocation(mLayout, Gravity.CENTER, 0, 0);
@@ -56,9 +59,9 @@ public class LoginActivity extends AppCompatActivity {
                             String url = request.getUrl().toString();
                             String token = url.split("&")[0].split("=")[1];
                             mPopupWindow.dismiss();
-                            Intent intent = OverviewActivity.newIntent(mContext, token);
+                            Intent intent = OverviewActivity.newIntent(mActivity, token);
                             startActivity(intent);
-
+                            mProgress.setVisibility(View.INVISIBLE);
                         }
                         return false;
                     }
