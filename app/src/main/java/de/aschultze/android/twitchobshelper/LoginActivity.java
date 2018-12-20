@@ -27,6 +27,7 @@ public class LoginActivity extends AppCompatActivity {
 
     private ConstraintLayout mLayout;
     private Button mLogin;
+    private Button testButton;
 
     private PopupWindow mPopupWindow;
 
@@ -39,6 +40,7 @@ public class LoginActivity extends AppCompatActivity {
         mActivity = LoginActivity.this;
         mLayout = findViewById(R.id.login_cl);
         mLogin = findViewById(R.id.login_btn_login);
+
 
         mLogin.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -66,6 +68,15 @@ public class LoginActivity extends AppCompatActivity {
                 String state = "15098B9074AB4157F92E09B6BF89A0E9";
                 String url = "https://id.twitch.tv/oauth2/authorize?client_id=rveutt431uc0qwzp6ncbp4cm7edqoj&redirect_uri=http://localhost&response_type=token&scope=channel_editor channel_read&state=" + state;
                 webView.loadUrl(url);
+            }
+        });
+
+        testButton = findViewById(R.id.button_test);
+        testButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = TestActivity.newIntent(mContext);
+                startActivity(intent);
             }
         });
     }
