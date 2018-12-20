@@ -190,6 +190,7 @@ public class OverviewActivity extends AppCompatActivity {
                     HashMap headers = new HashMap();
                     headers.put("Accept", "application/vnd.twitchtv.v5+json");
                     headers.put("Client-ID", TWITCH_CLIENT_ID);
+                    headers.put("Authorization", "OAuth " + mToken);
                     return headers;
                 }
             };
@@ -232,6 +233,7 @@ public class OverviewActivity extends AppCompatActivity {
                 HashMap headers = new HashMap();
                 headers.put("Accept", "application/vnd.twitchtv.v5+json");
                 headers.put("Client-ID", TWITCH_CLIENT_ID);
+                headers.put("Authorization", "OAuth " + mToken);
                 return headers;
             }
         };
