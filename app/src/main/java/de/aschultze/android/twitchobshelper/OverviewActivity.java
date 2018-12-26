@@ -30,6 +30,8 @@ import com.android.volley.toolbox.Volley;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -54,6 +56,9 @@ public class OverviewActivity extends AppCompatActivity {
     private Handler refreshHandler;
     private Runnable refreshRunnable;
     private int refreshSeconds = 10;
+
+    // WebSocket
+    private ObsWebSocket webSocket;
 
     // TwitchRequester states
     private static final int TWITCH_REQUEST_CHANNEL = 0;
@@ -104,6 +109,16 @@ public class OverviewActivity extends AppCompatActivity {
                 refreshHandler.postDelayed(refreshRunnable, millis);
             }
         };
+
+        // Websocket init
+        URI obsURI = null;
+        try {
+            obsURI = new URI("ws://192.168.178.46:4444");
+        } catch (URISyntaxException e) {
+            e.printStackTrace();
+        }
+        webSocket = new ObsWebSocket(obsURI);
+        webSocket.connect();
 
         // PopUpWindow init
         LayoutInflater inflater = (LayoutInflater) getApplicationContext().getSystemService(LAYOUT_INFLATER_SERVICE);
