@@ -29,49 +29,47 @@ public class TwitchRequester extends AsyncTask<Void, Void, JSONObject> {
     @Override
     protected JSONObject doInBackground(Void... voids) {
         JSONObject jsonObject = new JSONObject();
-        if (!isCancelled()) {
-            try {
-                switch (state) {
-                    case MyConstants.TWITCH_REQUEST_CHANNEL:
-                        JSONObject channel = future.get(10, TimeUnit.SECONDS);
-                        if (channel != null) {
-                            jsonObject = channel;
-                        } else {
-                            Log.d(TAG, "Requesting channel data went wrong!");
-                        }
-                        break;
-                    case MyConstants.TWITCH_REQUEST_STREAM:
-                        JSONObject stream = future.get(10, TimeUnit.SECONDS);
-                        if (stream != null) {
-                            jsonObject = stream;
-                        } else {
-                            Log.d(TAG, "Requesting stream data went wrong!");
-                        }
-                        break;
-                    case MyConstants.TWITCH_SEARCH_GAME:
-                        JSONObject gameSearch = future.get(10, TimeUnit.SECONDS);
-                        if (gameSearch != null) {
-                            jsonObject = gameSearch;
-                        } else {
-                            Log.d(TAG, "Searching games went wrong!");
-                        }
-                        break;
-                    case MyConstants.TWITCH_UPDATE_GAME:
-                        JSONObject gameUpdate = future.get(10, TimeUnit.SECONDS);
-                        if (gameUpdate != null) {
-                            jsonObject = gameUpdate;
-                        } else {
-                            Log.d(TAG, "Updating game title went wrong!");
-                        }
-                        break;
-                }
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (ExecutionException e) {
-                e.printStackTrace();
-            } catch (TimeoutException e) {
-                e.printStackTrace();
+        try {
+            switch (state) {
+                case MyConstants.TWITCH_REQUEST_CHANNEL:
+                    JSONObject channel = future.get(10, TimeUnit.SECONDS);
+                    if (channel != null) {
+                        jsonObject = channel;
+                    } else {
+                        Log.d(TAG, "Requesting channel data went wrong!");
+                    }
+                    break;
+                case MyConstants.TWITCH_REQUEST_STREAM:
+                    JSONObject stream = future.get(10, TimeUnit.SECONDS);
+                    if (stream != null) {
+                        jsonObject = stream;
+                    } else {
+                        Log.d(TAG, "Requesting stream data went wrong!");
+                    }
+                    break;
+                case MyConstants.TWITCH_SEARCH_GAME:
+                    JSONObject gameSearch = future.get(10, TimeUnit.SECONDS);
+                    if (gameSearch != null) {
+                        jsonObject = gameSearch;
+                    } else {
+                        Log.d(TAG, "Searching games went wrong!");
+                    }
+                    break;
+                case MyConstants.TWITCH_UPDATE_GAME:
+                    JSONObject gameUpdate = future.get(10, TimeUnit.SECONDS);
+                    if (gameUpdate != null) {
+                        jsonObject = gameUpdate;
+                    } else {
+                        Log.d(TAG, "Updating game title went wrong!");
+                    }
+                    break;
             }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (ExecutionException e) {
+            e.printStackTrace();
+        } catch (TimeoutException e) {
+            e.printStackTrace();
         }
         return jsonObject;
     }

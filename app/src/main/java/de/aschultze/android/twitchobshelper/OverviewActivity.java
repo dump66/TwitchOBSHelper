@@ -51,7 +51,6 @@ public class OverviewActivity extends AppCompatActivity implements CallbackUI {
 
     // Others
     private ObsWebSocket webSocket;
-    private AsyncTask asyncTask;
 
     // Scheduler
     private Handler refreshHandler;
@@ -146,9 +145,6 @@ public class OverviewActivity extends AppCompatActivity implements CallbackUI {
     protected void onPause() {
         super.onPause();
         mRefreshSwitch.setChecked(false);
-        if (asyncTask!=null){
-            asyncTask.cancel(true);
-        }
     }
 
     @Override
@@ -315,8 +311,7 @@ public class OverviewActivity extends AppCompatActivity implements CallbackUI {
         if (state == MyConstants.TWITCH_REQUEST_CHANNEL || state == MyConstants.TWITCH_REQUEST_STREAM) {
             mProgressBar.setVisibility(View.VISIBLE);
         }
-        asyncTask = new TwitchRequester(future, state, this);
-        asyncTask.execute();
+        new TwitchRequester(future, state, this).execute();
     }
 
     @Override
