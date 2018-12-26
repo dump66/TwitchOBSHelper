@@ -36,35 +36,27 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SwitchCompat;
 import androidx.constraintlayout.widget.ConstraintLayout;
 
-public class OverviewActivity extends AppCompatActivity {
+public class OverviewActivity extends AppCompatActivity implements CallbackUI {
 
     // General constants
     private static final String TAG = "OverviewActivity";
     private static final String EXTRA_TOKEN = "de.aschultze.android.twitchobshelper.token";
     private static final String TWITCH_CLIENT_ID = "rveutt431uc0qwzp6ncbp4cm7edqoj";
 
+    // Others
+    private ObsWebSocket webSocket;
+    private AsyncTask asyncTask;
+
     // Scheduler
     private Handler refreshHandler;
     private Runnable refreshRunnable;
     private int refreshSeconds = 10;
-
-    // WebSocket
-    private ObsWebSocket webSocket;
-
-    // TwitchRequester states
-    private static final int TWITCH_REQUEST_CHANNEL = 0;
-    private static final int TWITCH_REQUEST_STREAM = 1;
-    private static final int TWITCH_SEARCH_GAME = 2;
-    private static final int TWITCH_UPDATE_GAME = 3;
 
     // Member variables
     private String mToken;
@@ -74,6 +66,7 @@ public class OverviewActivity extends AppCompatActivity {
     // GUI member variables
     private ProgressBar mProgressBar;
     private Button mStreamStatusButton;
+    private Button mRecordStatusButton;
     private Button mGameButton;
     private TextView mGameTitleTV;
     private TextView mViewerCountTV;
@@ -118,7 +111,7 @@ public class OverviewActivity extends AppCompatActivity {
             e.printStackTrace();
         }
         webSocket = new ObsWebSocket(obsURI);
-        webSocket.connect();
+        // webSocket.connect();
 
         // PopUpWindow init
         LayoutInflater inflater = (LayoutInflater) getApplicationContext().getSystemService(LAYOUT_INFLATER_SERVICE);
@@ -129,6 +122,7 @@ public class OverviewActivity extends AppCompatActivity {
         // Overview
         mProgressBar = findViewById(R.id.overview_progress);
         mStreamStatusButton = findViewById(R.id.overview_stream_status);
+        mRecordStatusButton = findViewById(R.id.overview_record_status);
         mGameButton = findViewById(R.id.overview_btn_game);
         mGameTitleTV = findViewById(R.id.overview_game);
         mViewerCountTV = findViewById(R.id.overview_viewer);
@@ -152,6 +146,9 @@ public class OverviewActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         mRefreshSwitch.setChecked(false);
+        if (asyncTask!=null){
+            asyncTask.cancel(true);
+        }
     }
 
     @Override
@@ -231,7 +228,7 @@ public class OverviewActivity extends AppCompatActivity {
             }
         };
         mHttpRequestQueue.add(channelRequest);
-        new TwitchRequester(futureRequestChannel, TWITCH_REQUEST_CHANNEL).execute();
+        startAsyncTask(futureRequestChannel, MyConstants.TWITCH_REQUEST_CHANNEL);
 
         // Get Viewers
         if (mChannelID != null && !mChannelID.isEmpty()) {
@@ -248,7 +245,7 @@ public class OverviewActivity extends AppCompatActivity {
                 }
             };
             mHttpRequestQueue.add(streamRequest);
-            new TwitchRequester(futureRequestStream, TWITCH_REQUEST_STREAM).execute();
+            startAsyncTask(futureRequestStream, MyConstants.TWITCH_REQUEST_STREAM);
         }
     }
 
@@ -271,7 +268,7 @@ public class OverviewActivity extends AppCompatActivity {
                 }
             };
             mHttpRequestQueue.add(gameUpdateRequest);
-            new TwitchRequester(future, TWITCH_UPDATE_GAME).execute();
+            startAsyncTask(future, MyConstants.TWITCH_UPDATE_GAME);
         } catch (JSONException e) {
             e.printStackTrace();
         }
@@ -292,7 +289,7 @@ public class OverviewActivity extends AppCompatActivity {
         };
 
         mHttpRequestQueue.add(streamDataRequest);
-        new TwitchRequester(streamFuture, TWITCH_SEARCH_GAME).execute();
+        startAsyncTask(streamFuture, MyConstants.TWITCH_SEARCH_GAME);
     }
 
     private void setStreamStatus(boolean isOnline) {
@@ -314,150 +311,100 @@ public class OverviewActivity extends AppCompatActivity {
         }
     }
 
-    private class TwitchRequester extends AsyncTask<Void, Void, JSONObject> {
-
-        private static final String TAG = "TwitchRequester";
-
-        private RequestFuture<JSONObject> future;
-        private int state;
-
-        private TwitchRequester(RequestFuture<JSONObject> future, int state) {
-            this.future = future;
-            this.state = state;
-            if (state == TWITCH_REQUEST_CHANNEL || state == TWITCH_REQUEST_STREAM) {
-                mProgressBar.setVisibility(View.VISIBLE);
-            }
+    private void startAsyncTask(RequestFuture<JSONObject> future, int state) {
+        if (state == MyConstants.TWITCH_REQUEST_CHANNEL || state == MyConstants.TWITCH_REQUEST_STREAM) {
+            mProgressBar.setVisibility(View.VISIBLE);
         }
-
-        @Override
-        protected JSONObject doInBackground(Void... voids) {
-            JSONObject jsonObject = new JSONObject();
-            try {
-                switch (state) {
-                    case TWITCH_REQUEST_CHANNEL:
-                        JSONObject channel = future.get(10, TimeUnit.SECONDS);
-                        if (channel != null) {
-                            jsonObject = channel;
-                        } else {
-                            Log.d(TAG, "Requesting channel data went wrong!");
-                        }
-                        break;
-                    case TWITCH_REQUEST_STREAM:
-                        JSONObject stream = future.get(10, TimeUnit.SECONDS);
-                        if (stream != null) {
-                            jsonObject = stream;
-                        } else {
-                            Log.d(TAG, "Requesting stream data went wrong!");
-                        }
-                        break;
-                    case TWITCH_SEARCH_GAME:
-                        JSONObject gameSearch = future.get(10, TimeUnit.SECONDS);
-                        if (gameSearch != null) {
-                            jsonObject = gameSearch;
-                        } else {
-                            Log.d(TAG, "Searching games went wrong!");
-                        }
-                        break;
-                    case TWITCH_UPDATE_GAME:
-                        JSONObject gameUpdate = future.get(10, TimeUnit.SECONDS);
-                        if (gameUpdate != null) {
-                            jsonObject = gameUpdate;
-                        } else {
-                            Log.d(TAG, "Updating game title went wrong!");
-                        }
-                        break;
-                }
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (ExecutionException e) {
-                e.printStackTrace();
-            } catch (TimeoutException e) {
-                e.printStackTrace();
-            }
-            return jsonObject;
-        }
-
-        @Override
-        protected void onPostExecute(JSONObject jsonObject) {
-            super.onPostExecute(jsonObject);
-            switch (state) {
-                case TWITCH_REQUEST_CHANNEL:
-                    if (jsonObject.has("game")) {
-                        try {
-                            String gameTitle = (String) jsonObject.getString("game");
-                            mGameTitleTV.setText(gameTitle);
-
-                            // Set Channel ID once for future requests
-                            if (jsonObject.has("_id")) {
-                                if (mChannelID == null || mChannelID.isEmpty()) {
-                                    mChannelID = (String) jsonObject.getString("_id");
-                                    // start again for stream status and viewer update
-                                    refreshGUI();
-                                }
-                            } else {
-                                if (mChannelID == null || mChannelID.isEmpty()) {
-                                    Log.d(TAG, "Channel ID was not set!");
-                                }
-                            }
-
-                        } catch (JSONException e) {
-                            e.printStackTrace();
-                        }
-                    } else {
-                        Log.d(TAG, "Channel Request went wrong!");
-                    }
-                    break;
-                case TWITCH_REQUEST_STREAM:
-                    try {
-                        // Stream is offline
-                        if (jsonObject.isNull("stream")) {
-                            setStreamStatus(false);
-                            setViewerCount(0);
-                        } else {
-                            JSONObject stream = jsonObject.getJSONObject("stream");
-                            setStreamStatus(true);
-                            // Set game title only by channel update
-//                            mGameTitleTV.setText(stream.getString("game"));
-                            setViewerCount(stream.getInt("viewers"));
-                        }
-                        Log.d(TAG, "GUI Refresh completed");
-                    } catch (JSONException e) {
-                        e.printStackTrace();
-                    }
-                    break;
-                case TWITCH_SEARCH_GAME:
-                    try {
-                        if (jsonObject.getJSONArray("games").length() == 0) {
-                            mGameChooserAdapterList.clear();
-                            mGameChooserAdapter.notifyDataSetChanged();
-                        } else {
-                            mGameChooserAdapterList.clear();
-                            int gamesCount = jsonObject.getJSONArray("games").length();
-                            // Max 5 Games
-                            gamesCount = (gamesCount < 5) ? gamesCount : 5;
-                            for (int i = 0; i < gamesCount; i++) {
-                                JSONObject game = jsonObject.getJSONArray("games").getJSONObject(i);
-                                mGameChooserAdapterList.add(game.getString("name"));
-                            }
-                            mGameChooserAdapter.notifyDataSetChanged();
-                        }
-                    } catch (JSONException e) {
-                        e.printStackTrace();
-                    }
-                    break;
-                case TWITCH_UPDATE_GAME:
-                    try {
-                        mGameChooserPopup.dismiss();
-                        refreshGUI();
-                        Log.d(TAG, "Game is successfully set to " + jsonObject.getString("game"));
-                    } catch (JSONException e) {
-                        e.printStackTrace();
-                        Log.d(TAG, "Game Title could not be updated");
-                    }
-                    break;
-            }
-            mProgressBar.setVisibility(View.INVISIBLE);
-        }
-
+        asyncTask = new TwitchRequester(future, state, this);
+        asyncTask.execute();
     }
+
+    @Override
+    public void onChannelRequested(JSONObject json) {
+        if (json.has("game")) {
+            try {
+                String gameTitle = json.getString("game");
+                mGameTitleTV.setText(gameTitle);
+
+                // Set Channel ID once for future requests
+                if (json.has("_id")) {
+                    if (mChannelID == null || mChannelID.isEmpty()) {
+                        mChannelID = (String) json.getString("_id");
+                        // start again for stream status and viewer update
+                        refreshGUI();
+                    }
+                } else {
+                    if (mChannelID == null || mChannelID.isEmpty()) {
+                        Log.d(TAG, "Channel ID was not set!");
+                    }
+                }
+
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+        } else {
+            Log.d(TAG, "Channel Request went wrong!");
+        }
+    }
+
+    @Override
+    public void onStreamRequested(JSONObject json) {
+        try {
+            // Stream is offline
+            if (json.isNull("stream")) {
+                setStreamStatus(false);
+                setViewerCount(0);
+            } else {
+                JSONObject stream = json.getJSONObject("stream");
+                setStreamStatus(true);
+                // Set game title only by channel update
+                // mGameTitleTV.setText(stream.getString("game"));
+                setViewerCount(stream.getInt("viewers"));
+            }
+            Log.d(TAG, "GUI Refresh completed");
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void onSearchGame(JSONObject json) {
+        try {
+            if (json.getJSONArray("games").length() == 0) {
+                mGameChooserAdapterList.clear();
+                mGameChooserAdapter.notifyDataSetChanged();
+            } else {
+                mGameChooserAdapterList.clear();
+                int gamesCount = json.getJSONArray("games").length();
+                // Max 5 Games
+                gamesCount = (gamesCount < 5) ? gamesCount : 5;
+                for (int i = 0; i < gamesCount; i++) {
+                    JSONObject game = json.getJSONArray("games").getJSONObject(i);
+                    mGameChooserAdapterList.add(game.getString("name"));
+                }
+                mGameChooserAdapter.notifyDataSetChanged();
+            }
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void onGameUpdated(JSONObject json) {
+        try {
+            mGameChooserPopup.dismiss();
+            refreshGUI();
+            Log.d(TAG, "Game is successfully set to " + json.getString("game"));
+        } catch (JSONException e) {
+            e.printStackTrace();
+            Log.d(TAG, "Game Title could not be updated");
+        }
+    }
+
+    @Override
+    public void onProgressFinished() {
+        mProgressBar.setVisibility(View.INVISIBLE);
+    }
+
+
 }
