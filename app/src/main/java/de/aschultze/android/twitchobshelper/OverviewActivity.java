@@ -11,6 +11,7 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
@@ -93,6 +94,7 @@ public class OverviewActivity extends AppCompatActivity implements CallbackUI {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_overview);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         mToken = getIntent().getStringExtra(EXTRA_TOKEN);
         mIP = getIntent().getStringExtra(EXTRA_IP);
         mHttpRequestQueue = Volley.newRequestQueue(this);
