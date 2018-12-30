@@ -79,18 +79,18 @@ public class TwitchRequester extends AsyncTask<Void, Void, JSONObject> {
         super.onPostExecute(jsonObject);
         switch (state) {
             case MyConstants.TWITCH_REQUEST_CHANNEL:
-                listener.onChannelRequested(jsonObject);
+                listener.onTwitchChannelRequested(jsonObject);
                 break;
             case MyConstants.TWITCH_REQUEST_STREAM:
-                listener.onStreamRequested(jsonObject);
+                listener.onTwitchStreamRequested(jsonObject);
                 break;
             case MyConstants.TWITCH_SEARCH_GAME:
-                listener.onSearchGame(jsonObject);
+                listener.onTwitchSearchGame(jsonObject);
                 break;
             case MyConstants.TWITCH_UPDATE_GAME:
-                listener.onGameUpdated(jsonObject);
+                listener.onTwitchGameUpdated(jsonObject);
                 break;
         }
-        listener.onProgressFinished();
+        listener.onTwitchProgressFinished();
     }
 }

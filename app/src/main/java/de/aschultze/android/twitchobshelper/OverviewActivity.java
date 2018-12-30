@@ -3,7 +3,6 @@ package de.aschultze.android.twitchobshelper;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.text.Editable;
@@ -20,7 +19,6 @@ import android.widget.PopupWindow;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
-import com.android.volley.AuthFailureError;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.toolbox.JsonObjectRequest;
@@ -47,18 +45,23 @@ public class OverviewActivity extends AppCompatActivity implements CallbackUI {
     // General constants
     private static final String TAG = "OverviewActivity";
     private static final String EXTRA_TOKEN = "de.aschultze.android.twitchobshelper.token";
+    private static final String EXTRA_IP = "de.aschultze.android.twitchobshelper.ip";
     private static final String TWITCH_CLIENT_ID = "rveutt431uc0qwzp6ncbp4cm7edqoj";
 
-    // Others
-    private ObsWebSocket webSocket;
+    // OBS
+    private ObsWebSocket mWebSocket;
+    private boolean mIsStreaming = false;
+    private boolean mIsRecording = false;
 
     // Scheduler
-    private Handler refreshHandler;
-    private Runnable refreshRunnable;
-    private int refreshSeconds = 10;
+    private Handler mRefreshHandler;
+    private Runnable mRefreshRunnable;
+    private int mRefreshSeconds = 10;
 
     // Member variables
+    private String mIP;
     private String mToken;
+    private URI mObsURI;
     private RequestQueue mHttpRequestQueue;
     private String mChannelID;
 
@@ -76,11 +79,13 @@ public class OverviewActivity extends AppCompatActivity implements CallbackUI {
     private AutoCompleteTextView mGameChooserACTV;
     private ArrayAdapter<String> mGameChooserAdapter;
     private List<String> mGameChooserAdapterList;
+    private TextView mObsStatus;
 
 
-    public static Intent newIntent(Context packageContext, String token) {
+    public static Intent newIntent(Context packageContext, String token, String ip) {
         Intent intent = new Intent(packageContext, OverviewActivity.class);
         intent.putExtra(EXTRA_TOKEN, token);
+        intent.putExtra(EXTRA_IP, ip);
         return intent;
     }
 
@@ -89,28 +94,19 @@ public class OverviewActivity extends AppCompatActivity implements CallbackUI {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_overview);
         mToken = getIntent().getStringExtra(EXTRA_TOKEN);
+        mIP = getIntent().getStringExtra(EXTRA_IP);
         mHttpRequestQueue = Volley.newRequestQueue(this);
 
         // Scheduler init
-        refreshHandler = new Handler();
-        refreshRunnable = new Runnable() {
+        mRefreshHandler = new Handler();
+        mRefreshRunnable = new Runnable() {
             @Override
             public void run() {
                 refreshGUI();
-                long millis = refreshSeconds * 1000;
-                refreshHandler.postDelayed(refreshRunnable, millis);
+                long millis = mRefreshSeconds * 1000;
+                mRefreshHandler.postDelayed(mRefreshRunnable, millis);
             }
         };
-
-        // Websocket init
-        URI obsURI = null;
-        try {
-            obsURI = new URI("ws://192.168.178.46:4444");
-        } catch (URISyntaxException e) {
-            e.printStackTrace();
-        }
-        webSocket = new ObsWebSocket(obsURI);
-        // webSocket.connect();
 
         // PopUpWindow init
         LayoutInflater inflater = (LayoutInflater) getApplicationContext().getSystemService(LAYOUT_INFLATER_SERVICE);
@@ -126,6 +122,7 @@ public class OverviewActivity extends AppCompatActivity implements CallbackUI {
         mGameTitleTV = findViewById(R.id.overview_game);
         mViewerCountTV = findViewById(R.id.overview_viewer);
         mRefreshSwitch = findViewById(R.id.overview_refresh);
+        mObsStatus = findViewById(R.id.overview_tv_obs);
 
         // PopupWindow
         mGameChooserACTV = mGameChooserPopup.getContentView().findViewById(R.id.chooser_actv);
@@ -135,6 +132,15 @@ public class OverviewActivity extends AppCompatActivity implements CallbackUI {
         mGameChooserACTV.setAdapter(mGameChooserAdapter);
         mGameChooserOkButton = mGameChooserPopup.getContentView().findViewById(R.id.chooser_ok);
         mGameChooserCancelButton = mGameChooserPopup.getContentView().findViewById(R.id.chooser_cancel);
+
+        // Websocket init
+        try {
+            mObsURI = new URI(String.format("ws://%s:4444", mIP));
+        } catch (URISyntaxException e) {
+            e.printStackTrace();
+        }
+        mWebSocket = new ObsWebSocket(mObsURI, this);
+        mWebSocket.connect();
 
         initListener();
         mRefreshSwitch.setChecked(true);
@@ -162,6 +168,36 @@ public class OverviewActivity extends AppCompatActivity implements CallbackUI {
             }
         });
 
+        mStreamStatusButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                mProgressBar.setVisibility(View.VISIBLE);
+                JSONObject json = new JSONObject();
+                try {
+                    json.put("request-type", "StartStopStreaming");
+                    json.put("message-id", MyConstants.OBS_TRIGGER_STREAM);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+                sendWebSocketRequest(json);
+            }
+        });
+
+        mRecordStatusButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                mProgressBar.setVisibility(View.VISIBLE);
+                JSONObject json = new JSONObject();
+                try {
+                    json.put("request-type", "StartStopRecording");
+                    json.put("message-id", MyConstants.OBS_TRIGGER_RECORDING);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+                sendWebSocketRequest(json);
+            }
+        });
+
         mGameChooserACTV.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
@@ -186,9 +222,9 @@ public class OverviewActivity extends AppCompatActivity implements CallbackUI {
             public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
                 if (b) {
                     Log.d(TAG, "Starting Refresh Handler");
-                    refreshHandler.postDelayed(refreshRunnable, 0);
+                    mRefreshHandler.postDelayed(mRefreshRunnable, 0);
                 } else {
-                    refreshHandler.removeCallbacks(refreshRunnable);
+                    mRefreshHandler.removeCallbacks(mRefreshRunnable);
                     Log.d(TAG, "Stopped Refresh Handler");
                 }
             }
@@ -243,6 +279,16 @@ public class OverviewActivity extends AppCompatActivity implements CallbackUI {
             mHttpRequestQueue.add(streamRequest);
             startAsyncTask(futureRequestStream, MyConstants.TWITCH_REQUEST_STREAM);
         }
+
+        // Get OBS status
+        JSONObject json = new JSONObject();
+        try {
+            json.put("request-type", "GetStreamingStatus");
+            json.put("message-id", MyConstants.OBS_STREAM_STATUS);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+        sendWebSocketRequest(json);
     }
 
     private void updateChannelGame() {
@@ -255,7 +301,7 @@ public class OverviewActivity extends AppCompatActivity implements CallbackUI {
             request.put("channel", channel);
             JsonObjectRequest gameUpdateRequest = new JsonObjectRequest(Request.Method.PUT, url, request, future, future) {
                 @Override
-                public Map<String, String> getHeaders() throws AuthFailureError {
+                public Map<String, String> getHeaders() {
                     HashMap headers = new HashMap();
                     headers.put("Accept", "application/vnd.twitchtv.v5+json");
                     headers.put("Client-ID", TWITCH_CLIENT_ID);
@@ -288,13 +334,38 @@ public class OverviewActivity extends AppCompatActivity implements CallbackUI {
         startAsyncTask(streamFuture, MyConstants.TWITCH_SEARCH_GAME);
     }
 
-    private void setStreamStatus(boolean isOnline) {
-        if (isOnline) {
+    private void sendWebSocketRequest(JSONObject json) {
+        if (mWebSocket.isOpen()) {
+            mWebSocket.send(json.toString());
+        } else {
+            Log.d(TAG, "Websocket is closed. Creating new and retry to connect...");
+            mWebSocket.close();
+            mWebSocket = new ObsWebSocket(mObsURI, this);
+            mWebSocket.connect();
+        }
+    }
+
+    private void setStreamStatus(boolean isStreaming) {
+        if (isStreaming) {
+            mIsStreaming = true;
             mStreamStatusButton.setText(R.string.overview_stream_online);
             mStreamStatusButton.setBackgroundResource(R.color.streamOnline);
         } else {
+            mIsStreaming = false;
             mStreamStatusButton.setText(R.string.overview_stream_offline);
             mStreamStatusButton.setBackgroundResource(R.color.streamOffline);
+        }
+    }
+
+    private void setRecordStatus(boolean isRecording) {
+        if (isRecording) {
+            mIsRecording = true;
+            mRecordStatusButton.setText(R.string.overview_record_online);
+            mRecordStatusButton.setBackgroundResource(R.color.streamOnline);
+        } else {
+            mIsRecording = false;
+            mRecordStatusButton.setText(R.string.overview_record_offline);
+            mRecordStatusButton.setBackgroundResource(R.color.streamOffline);
         }
     }
 
@@ -315,7 +386,7 @@ public class OverviewActivity extends AppCompatActivity implements CallbackUI {
     }
 
     @Override
-    public void onChannelRequested(JSONObject json) {
+    public void onTwitchChannelRequested(JSONObject json) {
         if (json.has("game")) {
             try {
                 String gameTitle = json.getString("game");
@@ -343,17 +414,23 @@ public class OverviewActivity extends AppCompatActivity implements CallbackUI {
     }
 
     @Override
-    public void onStreamRequested(JSONObject json) {
+    public void onTwitchStreamRequested(JSONObject json) {
         try {
             // Stream is offline
             if (json.isNull("stream")) {
-                setStreamStatus(false);
+//                Only Obs sets stream status
+//                setStreamStatus(false);
+
                 setViewerCount(0);
             } else {
                 JSONObject stream = json.getJSONObject("stream");
-                setStreamStatus(true);
-                // Set game title only by channel update
-                // mGameTitleTV.setText(stream.getString("game"));
+
+//                Only Obs sets stream status
+//                setStreamStatus(true);
+
+//                Set game title only by channel update
+//                mGameTitleTV.setText(stream.getString("game"));
+
                 setViewerCount(stream.getInt("viewers"));
             }
             Log.d(TAG, "GUI Refresh completed");
@@ -363,7 +440,7 @@ public class OverviewActivity extends AppCompatActivity implements CallbackUI {
     }
 
     @Override
-    public void onSearchGame(JSONObject json) {
+    public void onTwitchSearchGame(JSONObject json) {
         try {
             if (json.getJSONArray("games").length() == 0) {
                 mGameChooserAdapterList.clear();
@@ -385,7 +462,7 @@ public class OverviewActivity extends AppCompatActivity implements CallbackUI {
     }
 
     @Override
-    public void onGameUpdated(JSONObject json) {
+    public void onTwitchGameUpdated(JSONObject json) {
         try {
             mGameChooserPopup.dismiss();
             refreshGUI();
@@ -397,8 +474,65 @@ public class OverviewActivity extends AppCompatActivity implements CallbackUI {
     }
 
     @Override
-    public void onProgressFinished() {
+    public void onTwitchProgressFinished() {
         mProgressBar.setVisibility(View.INVISIBLE);
+    }
+
+    @Override
+    public void onObsIsConnected() {
+        mObsStatus.setVisibility(View.INVISIBLE);
+    }
+
+    @Override
+    public void onObsErrorOrClosed(String message) {
+        mObsStatus.setVisibility(View.VISIBLE);
+    }
+
+    @Override
+    public void onObsStatusRequested(final JSONObject json) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    String status = json.getString("status");
+                    boolean isStreaming = json.getBoolean("streaming");
+                    boolean isRecording = json.getBoolean("recording");
+                    if (status.equals("ok")) {
+                        setStreamStatus(isStreaming);
+                        setRecordStatus(isRecording);
+                    } else {
+                        Log.d(TAG, "Stream Trigger failed: " + json.getString("error"));
+                    }
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+
+        });
+
+    }
+
+    @Override
+    public void onObsTriggerStream(final JSONObject json, final boolean isOnline) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                setStreamStatus(isOnline);
+                mProgressBar.setVisibility(View.INVISIBLE);
+            }
+        });
+
+    }
+
+    @Override
+    public void onObsTriggerRecording(final JSONObject json, final boolean isOnline) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                setRecordStatus(isOnline);
+                mProgressBar.setVisibility(View.INVISIBLE);
+            }
+        });
     }
 
 

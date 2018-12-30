@@ -10,8 +10,10 @@ import android.view.View;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.PopupWindow;
 import android.widget.ProgressBar;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -26,6 +28,7 @@ public class LoginActivity extends AppCompatActivity {
     private Activity mActivity;
 
     private ConstraintLayout mLayout;
+    private EditText mIP;
     private Button mLogin;
     private ProgressBar mProgress;
 
@@ -38,6 +41,7 @@ public class LoginActivity extends AppCompatActivity {
 
         mActivity = LoginActivity.this;
         mLayout = findViewById(R.id.login_cl);
+        mIP = findViewById(R.id.login_et_ip);
         mLogin = findViewById(R.id.login_btn_login);
         mProgress = findViewById(R.id.login_progress);
 
@@ -59,7 +63,7 @@ public class LoginActivity extends AppCompatActivity {
                             String url = request.getUrl().toString();
                             String token = url.split("&")[0].split("=")[1];
                             mPopupWindow.dismiss();
-                            Intent intent = OverviewActivity.newIntent(mActivity, token);
+                            Intent intent = OverviewActivity.newIntent(mActivity, token, mIP.getText().toString());
                             startActivity(intent);
                             mProgress.setVisibility(View.INVISIBLE);
                         }
